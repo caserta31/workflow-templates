@@ -22,7 +22,7 @@ on:
     types: [opened, synchronize]
 jobs:
   gate:
-    uses: proc015/workflow-templates/.github/workflows/risk-policy-gate.yml@main
+    uses: caserta31/workflow-templates/.github/workflows/risk-policy-gate.yml@main
 
 # .github/workflows/auto-review.yml
 name: Auto Code Review
@@ -32,7 +32,7 @@ on:
 jobs:
   review:
     needs: [gate]  # Only review if gate passes
-    uses: proc015/workflow-templates/.github/workflows/auto-review.yml@main
+    uses: caserta31/workflow-templates/.github/workflows/auto-review.yml@main
     secrets:
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 ```
