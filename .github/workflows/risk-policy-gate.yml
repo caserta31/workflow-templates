@@ -1,0 +1,157 @@
+name: Risk Policy Gate
+
+on:
+  workflow_call:
+    outputs:
+      risk_tier:
+        description: "The determined risk tier (high, medium, low)"
+        value: ${{ jobs.gate.outputs.risk_tier }}
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    outputs:
+      risk_tier: ${{ steps.classify.outputs.tier }}
+
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get changed files
+        id: changed
+        uses: tj-actions/changed-files@v44
+        with:
+          json: true
+
+      - name: Classify risk tier
+        id: classify
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+
+            // Load risk contract
+            const contractPath = path.join(process.env.GITHUB_WORKSPACE, 'risk-contract.json');
+            if (!fs.existsSync(contractPath)) {
+              core.setOutput('tier', 'low');
+              core.info('No risk-contract.json found — defaulting to low');
+              return;
+            }
+
+            const contract = JSON.parse(fs.readFileSync(contractPath, 'utf8'));
+            const changedFiles = JSON.parse('${{ steps.changed.outputs.all_changed_files }}');
+
+            // Convert glob patterns to regex
+            function globToRegex(pattern) {
+              return new RegExp('^' + pattern
+                .replace(/\./g, '\\.')
+                .replace(/\*\*/g, '{{GLOBSTAR}}')
+                .replace(/\*/g, '[^/]*')
+                .replace(/\{\{GLOBSTAR\}\}/g, '.*')
+                + '$');
+            }
+
+            // Classify each file, take the highest tier
+            const tierOrder = ['high', 'medium', 'low'];
+            let highestTier = 'low';
+            const highRiskFiles = [];
+
+            for (const file of changedFiles) {
+              for (const tier of tierOrder) {
+                const patterns = contract.riskTierRules[tier] || [];
+                for (const pattern of patterns) {
+                  if (globToRegex(pattern).test(file)) {
+                    const tierIndex = tierOrder.indexOf(tier);
+                    const currentIndex = tierOrder.indexOf(highestTier);
+                    if (tierIndex < currentIndex) {
+                      highestTier = tier;
+                    }
+                    if (tier === 'high') {
+                      highRiskFiles.push(file);
+                    }
+                    break;
+                  }
+                }
+                // Stop checking lower tiers once matched
+                const patterns2 = contract.riskTierRules[tier] || [];
+                if (patterns2.some(p => globToRegex(p).test(file))) break;
+              }
+            }
+
+            core.setOutput('tier', highestTier);
+            core.info(`Risk tier: ${highestTier.toUpperCase()}`);
+            if (highRiskFiles.length > 0) {
+              core.info(`High-risk files: ${highRiskFiles.join(', ')}`);
+            }
+
+            // Post PR comment with risk classification
+            const emoji = { high: '🔴', medium: '🟡', low: '🟢' };
+            const body = [
+              `## ${emoji[highestTier]} Risk Tier: **${highestTier.toUpperCase()}**`,
+              '',
+              `Changed ${changedFiles.length} file(s).`,
+            ];
+
+            if (highRiskFiles.length > 0) {
+              body.push('', '**High-risk files:**');
+              for (const f of highRiskFiles) {
+                body.push(`- \`${f}\``);
+              }
+            }
+
+            const policy = contract.mergePolicy[highestTier];
+            if (policy) {
+              body.push('', '**Required checks:**');
+              for (const check of policy.requiredChecks || []) {
+                body.push(`- [ ] ${check}`);
+              }
+              if (policy.requireHumanApproval) {
+                body.push('', '**Human approval required before merge.**');
+              }
+            }
+
+            // Find and update existing bot comment, or create new one
+            const marker = '<!-- risk-policy-gate -->';
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const existing = comments.find(c => c.body.includes(marker));
+            const commentBody = `${marker}\n${body.join('\n')}`;
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body: commentBody,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: commentBody,
+              });
+            }
+
+            // Add label for high-risk PRs
+            if (highestTier === 'high') {
+              try {
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.issue.number,
+                  labels: ['needs-human-review'],
+                });
+              } catch (e) {
+                core.info('Could not add label (may not exist yet)');
+              }
+            }

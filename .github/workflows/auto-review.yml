@@ -1,0 +1,39 @@
+name: Auto Code Review
+
+on:
+  workflow_call:
+    secrets:
+      ANTHROPIC_API_KEY:
+        required: true
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Claude Code Review
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          direct_prompt: |
+            Review this pull request. Read AGENTS.md first for project context, then CLAUDE.md for style conventions, then risk-contract.json for risk classification.
+
+            Focus on:
+            1. Correctness — does the code do what it claims?
+            2. Regressions — could this break existing functionality?
+            3. Security — any injection, auth bypass, or data exposure risks?
+            4. Style — does it follow the conventions in CLAUDE.md?
+            5. Simplicity — is there unnecessary complexity?
+
+            For each issue found, post an inline comment on the specific line.
+            End with a summary comment: APPROVED (no issues), CONCERNS (non-blocking issues noted), or CHANGES REQUESTED (blocking issues).
