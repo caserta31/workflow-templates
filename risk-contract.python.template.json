@@ -1,0 +1,46 @@
+{
+  "riskTierRules": {
+    "high": [
+      "**/.env*",
+      "**/docker-compose*.yml",
+      "**/Dockerfile*",
+      ".github/**",
+      "app/auth/**",
+      "app/config/**",
+      "app/models/user.*",
+      "alembic/**",
+      "migrations/**"
+    ],
+    "medium": [
+      "app/routes/**",
+      "app/models/**",
+      "app/services/**",
+      "app/schemas/**",
+      "requirements.txt",
+      "pyproject.toml",
+      "poetry.lock"
+    ],
+    "low": [
+      "app/templates/**",
+      "app/static/**",
+      "tests/**",
+      "**/*.md",
+      "**/*test*.py",
+      "**/*_test.py"
+    ]
+  },
+  "mergePolicy": {
+    "high": {
+      "requiredChecks": ["ci-pass", "claude-review", "human-review"],
+      "requireHumanApproval": true
+    },
+    "medium": {
+      "requiredChecks": ["ci-pass", "claude-review"],
+      "requireHumanApproval": false
+    },
+    "low": {
+      "requiredChecks": ["ci-pass"],
+      "requireHumanApproval": false
+    }
+  }
+}
