@@ -80,6 +80,19 @@ jobs:
             ${{ inputs.backend_dir }}/node_modules
           key: modules-${{ runner.os }}-${{ hashFiles('**/package-lock.json', '**/yarn.lock') }}
 
+      - name: Install root dependencies
+        run: ${{ inputs.package_manager }} install
+
+      - name: Install frontend dependencies
+        if: inputs.has_frontend
+        working-directory: ${{ inputs.frontend_dir }}
+        run: ${{ inputs.package_manager }} install
+
+      - name: Install backend dependencies
+        if: inputs.has_backend
+        working-directory: ${{ inputs.backend_dir }}
+        run: ${{ inputs.package_manager }} install
+
       - name: Lint frontend
         if: inputs.has_frontend
         working-directory: ${{ inputs.frontend_dir }}
@@ -108,6 +121,19 @@ jobs:
             ${{ inputs.frontend_dir }}/node_modules
             ${{ inputs.backend_dir }}/node_modules
           key: modules-${{ runner.os }}-${{ hashFiles('**/package-lock.json', '**/yarn.lock') }}
+
+      - name: Install root dependencies
+        run: ${{ inputs.package_manager }} install
+
+      - name: Install frontend dependencies
+        if: inputs.has_frontend
+        working-directory: ${{ inputs.frontend_dir }}
+        run: ${{ inputs.package_manager }} install
+
+      - name: Install backend dependencies
+        if: inputs.has_backend
+        working-directory: ${{ inputs.backend_dir }}
+        run: ${{ inputs.package_manager }} install
 
       - name: Test frontend
         if: inputs.has_frontend
