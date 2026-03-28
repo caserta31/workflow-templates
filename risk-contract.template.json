@@ -1,0 +1,46 @@
+{
+  "riskTierRules": {
+    "high": [
+      "**/.env*",
+      "**/docker-compose*.yml",
+      "**/Dockerfile*",
+      ".github/**",
+      "server/middleware/auth*",
+      "server/config/**",
+      "server/models/User.*"
+    ],
+    "medium": [
+      "server/routes/**",
+      "server/models/**",
+      "server/controllers/**",
+      "client/src/api/**",
+      "client/src/context/**",
+      "package.json",
+      "client/package.json",
+      "server/package.json"
+    ],
+    "low": [
+      "client/src/components/**",
+      "client/src/pages/**",
+      "client/src/styles/**",
+      "client/src/assets/**",
+      "**/*.md",
+      "**/*.test.*",
+      "**/*.spec.*"
+    ]
+  },
+  "mergePolicy": {
+    "high": {
+      "requiredChecks": ["ci-pass", "claude-review", "human-review"],
+      "requireHumanApproval": true
+    },
+    "medium": {
+      "requiredChecks": ["ci-pass", "claude-review"],
+      "requireHumanApproval": false
+    },
+    "low": {
+      "requiredChecks": ["ci-pass"],
+      "requireHumanApproval": false
+    }
+  }
+}

@@ -1,0 +1,120 @@
+name: CI Pipeline
+
+on:
+  workflow_call:
+    inputs:
+      node_version:
+        description: "Node.js version"
+        type: string
+        default: "20"
+      package_manager:
+        description: "Package manager (npm or yarn)"
+        type: string
+        default: "npm"
+      has_frontend:
+        description: "Run frontend lint/test"
+        type: boolean
+        default: true
+      has_backend:
+        description: "Run backend lint/test"
+        type: boolean
+        default: true
+      frontend_dir:
+        description: "Frontend directory"
+        type: string
+        default: "client"
+      backend_dir:
+        description: "Backend directory"
+        type: string
+        default: "server"
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node_version }}
+          cache: ${{ inputs.package_manager }}
+
+      - name: Install root dependencies
+        run: ${{ inputs.package_manager }} install
+
+      - name: Install frontend dependencies
+        if: inputs.has_frontend
+        working-directory: ${{ inputs.frontend_dir }}
+        run: ${{ inputs.package_manager }} install
+
+      - name: Install backend dependencies
+        if: inputs.has_backend
+        working-directory: ${{ inputs.backend_dir }}
+        run: ${{ inputs.package_manager }} install
+
+      - name: Cache node_modules
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            node_modules
+            ${{ inputs.frontend_dir }}/node_modules
+            ${{ inputs.backend_dir }}/node_modules
+          key: modules-${{ runner.os }}-${{ hashFiles('**/package-lock.json', '**/yarn.lock') }}
+
+  lint:
+    needs: install
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node_version }}
+
+      - name: Restore node_modules
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            node_modules
+            ${{ inputs.frontend_dir }}/node_modules
+            ${{ inputs.backend_dir }}/node_modules
+          key: modules-${{ runner.os }}-${{ hashFiles('**/package-lock.json', '**/yarn.lock') }}
+
+      - name: Lint frontend
+        if: inputs.has_frontend
+        working-directory: ${{ inputs.frontend_dir }}
+        run: ${{ inputs.package_manager }} run lint
+
+      - name: Lint backend
+        if: inputs.has_backend
+        working-directory: ${{ inputs.backend_dir }}
+        run: ${{ inputs.package_manager }} run lint
+
+  test:
+    needs: install
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node_version }}
+
+      - name: Restore node_modules
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            node_modules
+            ${{ inputs.frontend_dir }}/node_modules
+            ${{ inputs.backend_dir }}/node_modules
+          key: modules-${{ runner.os }}-${{ hashFiles('**/package-lock.json', '**/yarn.lock') }}
+
+      - name: Test frontend
+        if: inputs.has_frontend
+        working-directory: ${{ inputs.frontend_dir }}
+        run: ${{ inputs.package_manager }} test -- --passWithNoTests
+
+      - name: Test backend
+        if: inputs.has_backend
+        working-directory: ${{ inputs.backend_dir }}
+        run: ${{ inputs.package_manager }} test -- --passWithNoTests

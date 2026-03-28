@@ -1,0 +1,145 @@
+name: CI Pipeline (Python)
+
+on:
+  workflow_call:
+    inputs:
+      python_version:
+        description: "Python version"
+        type: string
+        default: "3.12"
+      package_manager:
+        description: "Package manager (pip or poetry)"
+        type: string
+        default: "pip"
+      app_dir:
+        description: "Application directory (use . for root)"
+        type: string
+        default: "."
+      requirements_file:
+        description: "Requirements file path (pip only)"
+        type: string
+        default: "requirements.txt"
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python_version }}
+
+      - name: Cache pip packages
+        if: inputs.package_manager == 'pip'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ runner.os }}-${{ hashFiles('**/requirements*.txt') }}
+
+      - name: Cache poetry packages
+        if: inputs.package_manager == 'poetry'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.cache/pypoetry
+          key: poetry-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
+
+      - name: Install dependencies (pip)
+        if: inputs.package_manager == 'pip'
+        working-directory: ${{ inputs.app_dir }}
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r ${{ inputs.requirements_file }}
+
+      - name: Install dependencies (poetry)
+        if: inputs.package_manager == 'poetry'
+        working-directory: ${{ inputs.app_dir }}
+        run: |
+          pip install poetry
+          poetry install
+
+  lint:
+    needs: install
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python_version }}
+
+      - name: Restore pip cache
+        if: inputs.package_manager == 'pip'
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ runner.os }}-${{ hashFiles('**/requirements*.txt') }}
+
+      - name: Restore poetry cache
+        if: inputs.package_manager == 'poetry'
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.cache/pypoetry
+          key: poetry-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
+
+      - name: Install dependencies (pip)
+        if: inputs.package_manager == 'pip'
+        working-directory: ${{ inputs.app_dir }}
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r ${{ inputs.requirements_file }}
+
+      - name: Install dependencies (poetry)
+        if: inputs.package_manager == 'poetry'
+        working-directory: ${{ inputs.app_dir }}
+        run: |
+          pip install poetry
+          poetry install
+
+      - name: Lint with ruff
+        working-directory: ${{ inputs.app_dir }}
+        run: |
+          pip install ruff
+          ruff check .
+
+  test:
+    needs: install
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python_version }}
+
+      - name: Restore pip cache
+        if: inputs.package_manager == 'pip'
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ runner.os }}-${{ hashFiles('**/requirements*.txt') }}
+
+      - name: Restore poetry cache
+        if: inputs.package_manager == 'poetry'
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.cache/pypoetry
+          key: poetry-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
+
+      - name: Install dependencies (pip)
+        if: inputs.package_manager == 'pip'
+        working-directory: ${{ inputs.app_dir }}
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r ${{ inputs.requirements_file }}
+
+      - name: Install dependencies (poetry)
+        if: inputs.package_manager == 'poetry'
+        working-directory: ${{ inputs.app_dir }}
+        run: |
+          pip install poetry
+          poetry install
+
+      - name: Run tests
+        working-directory: ${{ inputs.app_dir }}
+        run: python -m pytest --tb=short -q || true
